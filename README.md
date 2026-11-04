@@ -19,6 +19,7 @@ L'objectif du projet est de construire une application maintenable, testable et 
 | JUnit 5 | Tests unitaires |
 | Mockito | Tests des cas d'utilisation |
 | MockMvc (`@WebMvcTest`) | Test de la couche web |
+| ArchUnit | Vérification des règles DDD, Clean Architecture et architecture hexagonale |
 
 Lombok est déclaré dans le `pom.xml` mais n'est pas utilisé ; DevTools est une dépendance optionnelle.
 
@@ -439,6 +440,21 @@ Ils vérifient l'orchestration des cas d'utilisation avec des mocks Mockito de `
 **Tests web**
 
 `OrderControllerTest` (`@WebMvcTest` + MockMvc) vérifie les routes et le header `Location`.
+
+**Tests d'architecture**
+
+`ArchitectureTest` (ArchUnit) vérifie statiquement la structure du code en analysant le bytecode de `dev.alphasow.ecommerce` (classes de test exclues). Il ne démarre ni Spring ni la base de données. Règles contrôlées, par catégorie :
+
+- **Clean Architecture** : le domaine n'est accessible que depuis l'application et l'infrastructure ; l'application n'est accessible que depuis l'infrastructure ; l'application ne dépend ni de l'infrastructure, ni de Spring, JPA, Bean Validation, Hibernate ou Jackson.
+- **DDD** : le domaine ne dépend que de lui-même et du JDK ; les exceptions du domaine sont des `RuntimeException` ; `OrderItem` (interne à l'agrégat) n'est référencé que par le domaine, l'application et le mapper de persistance, donc jamais par le web.
+- **Architecture hexagonale** : les ports sortants sont des interfaces ne dépendant que du domaine et du JDK ; toute classe (imbriquées comprises) de `persistence.adapter` implémente `OrderRepository` ; web et persistence ne se dépendent pas et n'utilisent pas `infrastructure.configuration` ; le web n'accède ni aux ports sortants ni directement aux classes de `domain.model` (l'exception métier de `domain.exception` reste utilisée par le handler) ; JPA/Spring Data sont confinés à `persistence`, Bean Validation à `web` ; les entités `@Entity` résident dans `persistence.entity`, les contrôleurs/advices (annotés directement ou par méta-annotation `@Controller`/`@ControllerAdvice`) dans `web`, les `@Configuration` dans `configuration`.
+- **Gardes** : des règles vérifient que les packages porteurs de règles contiennent des classes importées (pas de succès par vacuité).
+
+Limites : ce test contrôle la structure, pas les invariants métiers (couverts par les tests du domaine). Il n'impose pas de `port.in`, absent par choix, ni de règles liées à d'autres bounded contexts.
+
+```bash
+./mvnw -q test -Dtest=ArchitectureTest
+```
 
 **Tests d'intégration**
 
